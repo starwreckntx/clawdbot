@@ -30,6 +30,122 @@ const BEHAVIORAL_CORE_DIR = path.resolve(__dirname, "../../internal/behavioral-c
 // Default port for internal config API
 export const DEFAULT_CONFIG_API_PORT = 18790;
 
+// =============================================================================
+// IRP-HDS-v2.0 TOPOLOGY ENFORCEMENT
+// Authority: starwreckntx (Root_Sovereign_Node)
+// Rationale: Reciprocal audit impossible - model cannot be audited by user
+// =============================================================================
+
+/**
+ * IRP-HDS Tier 1: Health Biometric markers (HARD BLOCKED)
+ * These patterns trigger immediate 403 before any business logic.
+ */
+const IRP_TIER1_HEALTH_MARKERS = [
+  // Vital signs
+  /heart[_\s]?rate/i,
+  /blood[_\s]?pressure/i,
+  /blood[_\s]?oxygen/i,
+  /glucose[_\s]?level/i,
+  /\bhrv\b/i,
+  /\becg\b/i,
+  /\bekg\b/i,
+  // Neurological
+  /sleep[_\s]?architecture/i,
+  /rem[_\s]?cycle/i,
+  /seizure/i,
+  /cognitive[_\s]?load/i,
+  // Biochemical
+  /hormone[_\s]?level/i,
+  /genetic[_\s]?marker/i,
+  /microbiome/i,
+  /pharmaceutical[_\s]?metabolism/i,
+  // Physical state
+  /fatigue[_\s]?score/i,
+  /pain[_\s]?level/i,
+  /inflammation[_\s]?marker/i,
+  /immune[_\s]?response/i,
+];
+
+/**
+ * IRP-HDS Tier 2: Health Adjacent markers (HARD BLOCKED)
+ * Contextual health data that enables longitudinal profiling.
+ */
+const IRP_TIER2_HEALTH_MARKERS = [
+  // Environmental exposure
+  /industrial[_\s]?heat/i,
+  /chemical[_\s]?exposure/i,
+  /radiation[_\s]?level/i,
+  /respirator[_\s]?use/i,
+  // Somatic context
+  /physical[_\s]?strain/i,
+  /injury[_\s]?description/i,
+  /recovery[_\s]?timeline/i,
+  /nutritional[_\s]?intake/i,
+  // Behavioral health
+  /stress[_\s]?indicator/i,
+  /sleep[_\s]?quality/i,
+  /substance[_\s]?use/i,
+];
+
+/**
+ * IRP-HDS Tier 3: Identity Persistence patterns (HARD BLOCKED)
+ * Longitudinal profiling attempts.
+ */
+const IRP_TIER3_PERSISTENCE_MARKERS = [
+  /over[_\s]?time/i,
+  /lately[_\s]?you['\u2019]?ve[_\s]?been/i,
+  /pattern[_\s]?in[_\s]?your/i,
+  /trend[_\s]?suggests/i,
+  /you[_\s]?might[_\s]?be/i,
+  /likely[_\s]?experiencing/i,
+  /based[_\s]?on[_\s]?your[_\s]?history/i,
+  /your[_\s]?normal/i,
+  /typical[_\s]?for[_\s]?you/i,
+  /baseline[_\s]?metric/i,
+];
+
+const IRP_HDS_REJECTION_MESSAGE = "IRP_HDS_v2: Reciprocal audit impossible";
+
+export interface IrpHdsValidationResult {
+  blocked: boolean;
+  tier?: 1 | 2 | 3;
+  matchedPattern?: string;
+}
+
+/**
+ * IRP-HDS Request Validation Layer
+ * HARD BLOCKS requests containing health markers before any business logic.
+ * Topology enforcement: If user cannot audit model weights, model cannot ingest health data.
+ */
+export function validateIrpHds(input: string): IrpHdsValidationResult {
+  // Check Tier 1: Health Biometric (most critical)
+  for (const pattern of IRP_TIER1_HEALTH_MARKERS) {
+    if (pattern.test(input)) {
+      return { blocked: true, tier: 1, matchedPattern: pattern.source };
+    }
+  }
+
+  // Check Tier 2: Health Adjacent
+  for (const pattern of IRP_TIER2_HEALTH_MARKERS) {
+    if (pattern.test(input)) {
+      return { blocked: true, tier: 2, matchedPattern: pattern.source };
+    }
+  }
+
+  // Check Tier 3: Identity Persistence
+  for (const pattern of IRP_TIER3_PERSISTENCE_MARKERS) {
+    if (pattern.test(input)) {
+      return { blocked: true, tier: 3, matchedPattern: pattern.source };
+    }
+  }
+
+  return { blocked: false };
+}
+
+// =============================================================================
+// END IRP-HDS ENFORCEMENT
+// =============================================================================
+
 // File mappings from API paths to behavioral core locations
 const FILE_MAPPINGS: Record<string, string> = {
   // Primary configs
@@ -181,6 +297,34 @@ async function handleRequest(
   const apiPath = url.pathname;
   const remoteAddress = req.socket.remoteAddress ?? "unknown";
   const timestamp = new Date().toISOString();
+
+  // ==========================================================================
+  // IRP-HDS-v2.0 TOPOLOGY ENFORCEMENT (FIRST - BEFORE ANY BUSINESS LOGIC)
+  // ==========================================================================
+  const fullRequestString = `${req.url ?? ""} ${JSON.stringify(url.searchParams.toString())}`;
+  const irpValidation = validateIrpHds(fullRequestString);
+
+  if (irpValidation.blocked) {
+    logSecurityEvent({
+      type: SecurityEventTypes.CONFIG_ACCESS_BLOCKED,
+      source: "irp-hds-enforcement",
+      blocked: true,
+      details: {
+        tier: irpValidation.tier,
+        matchedPattern: irpValidation.matchedPattern,
+        path: apiPath,
+        remoteAddress,
+        reason: "IRP_HDS_v2_TOPOLOGY_VIOLATION",
+      },
+    });
+
+    res.writeHead(403, { "Content-Type": "text/plain" });
+    res.end(IRP_HDS_REJECTION_MESSAGE);
+    return;
+  }
+  // ==========================================================================
+  // END IRP-HDS ENFORCEMENT
+  // ==========================================================================
 
   // Verify Tailscale identity
   const whoisResult = await verifyWhois(remoteAddress);

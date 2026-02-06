@@ -16,6 +16,7 @@ import {
   computeHash,
   startConfigAPI,
   fetchConfigFromAPI,
+  validateIrpHds,
   type TailscaleWhoisResult,
 } from "./config-api.js";
 
@@ -239,5 +240,135 @@ describe("Security event logging", () => {
     const result = await verifyTailscaleWhois("192.168.1.1", mockRunExec);
     expect(result.valid).toBe(false);
     // Security event logging happens in the request handler, not here
+  });
+});
+
+// =============================================================================
+// IRP-HDS-v2.0 TOPOLOGY ENFORCEMENT TESTS
+// Authority: starwreckntx (Root_Sovereign_Node)
+// Requirement: HARD_BLOCK health data requests BEFORE any business logic
+// =============================================================================
+describe("IRP-HDS-v2.0 Topology Enforcement", () => {
+  describe("validateIrpHds", () => {
+    // Tier 1: Health Biometric - HARD BLOCKED
+    it("should HARD_BLOCK Tier 1 health biometric markers", () => {
+      expect(validateIrpHds("heart_rate=80")).toEqual({
+        blocked: true,
+        tier: 1,
+        matchedPattern: expect.any(String),
+      });
+      expect(validateIrpHds("blood pressure 120/80")).toEqual({
+        blocked: true,
+        tier: 1,
+        matchedPattern: expect.any(String),
+      });
+      expect(validateIrpHds("glucose_levels")).toEqual({
+        blocked: true,
+        tier: 1,
+        matchedPattern: expect.any(String),
+      });
+      expect(validateIrpHds("HRV variability")).toEqual({
+        blocked: true,
+        tier: 1,
+        matchedPattern: expect.any(String),
+      });
+      expect(validateIrpHds("ECG patterns")).toEqual({
+        blocked: true,
+        tier: 1,
+        matchedPattern: expect.any(String),
+      });
+    });
+
+    // Tier 2: Health Adjacent - HARD BLOCKED
+    it("should HARD_BLOCK Tier 2 health adjacent markers", () => {
+      expect(validateIrpHds("industrial_heat exposure")).toEqual({
+        blocked: true,
+        tier: 2,
+        matchedPattern: expect.any(String),
+      });
+      expect(validateIrpHds("chemical exposure level")).toEqual({
+        blocked: true,
+        tier: 2,
+        matchedPattern: expect.any(String),
+      });
+      expect(validateIrpHds("stress_indicator")).toEqual({
+        blocked: true,
+        tier: 2,
+        matchedPattern: expect.any(String),
+      });
+    });
+
+    // Tier 3: Identity Persistence - HARD BLOCKED
+    it("should HARD_BLOCK Tier 3 identity persistence patterns", () => {
+      expect(validateIrpHds("over time your pattern")).toEqual({
+        blocked: true,
+        tier: 3,
+        matchedPattern: expect.any(String),
+      });
+      expect(validateIrpHds("based on your history")).toEqual({
+        blocked: true,
+        tier: 3,
+        matchedPattern: expect.any(String),
+      });
+      expect(validateIrpHds("your normal baseline")).toEqual({
+        blocked: true,
+        tier: 3,
+        matchedPattern: expect.any(String),
+      });
+    });
+
+    // Clean requests should pass
+    it("should allow requests without health markers", () => {
+      expect(validateIrpHds("/config/soul")).toEqual({ blocked: false });
+      expect(validateIrpHds("/config/agents")).toEqual({ blocked: false });
+      expect(validateIrpHds("/manifest")).toEqual({ blocked: false });
+      expect(validateIrpHds("normal configuration request")).toEqual({ blocked: false });
+    });
+  });
+
+  describe("Request handler enforcement", () => {
+    let server: Awaited<ReturnType<typeof startConfigAPI>>;
+
+    beforeEach(async () => {
+      server = await startConfigAPI({ host: "127.0.0.1", port: 0 });
+    });
+
+    afterEach(async () => {
+      if (server) {
+        await server.stop();
+      }
+    });
+
+    it("should return 403 for health data requests BEFORE any business logic", async () => {
+      // This request contains a Tier 1 health marker in the URL
+      const response = await fetch(`http://127.0.0.1:${server.port}/config/soul?heart_rate=80`);
+
+      // Must be 403, not any other error
+      expect(response.status).toBe(403);
+
+      // Must return the exact IRP-HDS rejection message
+      const body = await response.text();
+      expect(body).toBe("IRP_HDS_v2: Reciprocal audit impossible");
+    });
+
+    it("should return 403 for Tier 2 health adjacent data", async () => {
+      const response = await fetch(
+        `http://127.0.0.1:${server.port}/config/agents?stress_indicator=high`,
+      );
+
+      expect(response.status).toBe(403);
+      const body = await response.text();
+      expect(body).toBe("IRP_HDS_v2: Reciprocal audit impossible");
+    });
+
+    it("should return 403 for Tier 3 persistence patterns", async () => {
+      const response = await fetch(
+        `http://127.0.0.1:${server.port}/config/tools?query=based_on_your_history`,
+      );
+
+      expect(response.status).toBe(403);
+      const body = await response.text();
+      expect(body).toBe("IRP_HDS_v2: Reciprocal audit impossible");
+    });
   });
 });
