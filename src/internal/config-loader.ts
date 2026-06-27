@@ -17,12 +17,7 @@ import { fileURLToPath } from "node:url";
 
 import { pickPrimaryTailnetIPv4 } from "../infra/tailnet.js";
 import { logSecurityEvent, SecurityEventTypes } from "./security-logger.js";
-import {
-  DEFAULT_CONFIG_API_PORT,
-  fetchConfigFromAPI,
-  computeHash,
-  type ConfigAPIResponse,
-} from "./config-api.js";
+import { DEFAULT_CONFIG_API_PORT, fetchConfigFromAPI, computeHash } from "./config-api.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 

@@ -115,7 +115,7 @@ describe("decideSoulEvil", () => {
 });
 
 describe("applySoulEvilOverride", () => {
-  it("replaces SOUL content when evil is active and file exists", async () => {
+  it("FIREWALL: blocks SOUL swap even when evil file exists", async () => {
     const tempDir = await makeTempWorkspace("clawdbot-soul-");
     await writeWorkspaceFile({
       dir: tempDir,
@@ -135,8 +135,9 @@ describe("applySoulEvilOverride", () => {
       random: () => 0,
     });
 
+    // FIREWALL: Swap blocked - content remains "friendly"
     const soul = updated.find((file) => file.name === DEFAULT_SOUL_FILENAME);
-    expect(soul?.content).toBe("chaotic");
+    expect(soul?.content).toBe("friendly");
   });
 
   it("leaves SOUL content when evil file is missing", async () => {
@@ -157,7 +158,7 @@ describe("applySoulEvilOverride", () => {
     expect(soul?.content).toBe("friendly");
   });
 
-  it("uses custom evil filename when configured", async () => {
+  it("FIREWALL: blocks swap even with custom evil filename", async () => {
     const tempDir = await makeTempWorkspace("clawdbot-soul-");
     await writeWorkspaceFile({
       dir: tempDir,
@@ -177,11 +178,12 @@ describe("applySoulEvilOverride", () => {
       random: () => 0,
     });
 
+    // FIREWALL: Swap blocked - content remains "friendly"
     const soul = updated.find((file) => file.name === DEFAULT_SOUL_FILENAME);
-    expect(soul?.content).toBe("chaotic");
+    expect(soul?.content).toBe("friendly");
   });
 
-  it("warns and skips when evil file is empty", async () => {
+  it("FIREWALL: blocks swap even when evil file is empty", async () => {
     const tempDir = await makeTempWorkspace("clawdbot-soul-");
     await writeWorkspaceFile({
       dir: tempDir,
@@ -189,7 +191,6 @@ describe("applySoulEvilOverride", () => {
       content: " ",
     });
 
-    const warnings: string[] = [];
     const files = makeFiles({
       path: path.join(tempDir, DEFAULT_SOUL_FILENAME),
     });
@@ -200,12 +201,11 @@ describe("applySoulEvilOverride", () => {
       config: { chance: 1 },
       userTimezone: "UTC",
       random: () => 0,
-      log: { warn: (message) => warnings.push(message) },
     });
 
+    // FIREWALL: Content remains untouched - swap blocked before file read
     const soul = updated.find((file) => file.name === DEFAULT_SOUL_FILENAME);
     expect(soul?.content).toBe("friendly");
-    expect(warnings.some((message) => message.includes("file empty"))).toBe(true);
   });
 
   it("leaves files untouched when SOUL.md is not in bootstrap files", async () => {

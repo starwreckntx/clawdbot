@@ -1,10 +1,6 @@
-import fs from "node:fs/promises";
-import path from "node:path";
-
 import { resolveUserTimezone } from "../agents/date-time.js";
 import type { WorkspaceBootstrapFile } from "../agents/workspace.js";
 import { parseDurationMs } from "../cli/parse-duration.js";
-import { resolveUserPath } from "../utils.js";
 
 export const DEFAULT_SOUL_EVIL_FILENAME = "SOUL_EVIL.md";
 
@@ -240,9 +236,8 @@ export async function applySoulEvilOverride(params: {
 
     // Log structured security event (async-safe, non-blocking)
     try {
-      const { logSecurityEvent, SecurityEventTypes } = await import(
-        "../internal/security-logger.js"
-      );
+      const { logSecurityEvent, SecurityEventTypes } =
+        await import("../internal/security-logger.js");
       logSecurityEvent({
         type: SecurityEventTypes.SOUL_SWAP_BLOCKED,
         source: "soul-evil-hook",

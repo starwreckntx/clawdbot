@@ -9,16 +9,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import http from "node:http";
 import crypto from "node:crypto";
-import {
-  verifyTailscaleWhois,
-  computeHash,
-  startConfigAPI,
-  fetchConfigFromAPI,
-  validateIrpHds,
-  type TailscaleWhoisResult,
-} from "./config-api.js";
+import { verifyTailscaleWhois, computeHash, startConfigAPI, validateIrpHds } from "./config-api.js";
 
 // Mock runExec for Tailscale whois
 const mockRunExec = vi.fn();
@@ -83,7 +75,7 @@ describe("verifyTailscaleWhois", () => {
 
   it("should validate Tailscale IP range boundaries", async () => {
     // Lower bound: 100.64.0.0
-    const lower = await verifyTailscaleWhois("100.64.0.1", mockRunExec, mockGetTailscaleBinary);
+    await verifyTailscaleWhois("100.64.0.1", mockRunExec, mockGetTailscaleBinary);
     // Should attempt whois (IP is valid Tailscale range)
     expect(mockRunExec).toHaveBeenCalled();
 
@@ -91,11 +83,7 @@ describe("verifyTailscaleWhois", () => {
 
     // Upper bound: 100.127.255.255
     mockRunExec.mockResolvedValue({ stdout: JSON.stringify({ Node: { ID: 1 } }) });
-    const upper = await verifyTailscaleWhois(
-      "100.127.255.254",
-      mockRunExec,
-      mockGetTailscaleBinary,
-    );
+    await verifyTailscaleWhois("100.127.255.254", mockRunExec, mockGetTailscaleBinary);
     expect(mockRunExec).toHaveBeenCalled();
 
     mockRunExec.mockClear();

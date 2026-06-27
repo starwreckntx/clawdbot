@@ -399,7 +399,7 @@ async function handleRequest(
 
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ manifest, timestamp }));
-    } catch (err) {
+    } catch {
       res.writeHead(500, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Failed to generate manifest" }));
     }
@@ -427,7 +427,7 @@ async function handleRequest(
         });
         res.end(JSON.stringify({ category, skills: skillsWithHashes, timestamp }));
         return;
-      } catch (err) {
+      } catch {
         res.writeHead(500, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: `Failed to load skills for category: ${category}` }));
         return;
@@ -460,7 +460,7 @@ async function handleRequest(
       "X-Config-Timestamp": timestamp,
     });
     res.end(JSON.stringify(response));
-  } catch (err) {
+  } catch {
     res.writeHead(500, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ error: "Failed to read config file", path: apiPath }));
   }
